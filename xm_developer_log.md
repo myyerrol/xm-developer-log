@@ -54,7 +54,7 @@
 
 **问题：**<br>
 1、launch文件中载入了底盘的Controller配置文件到参数服务器中，并且在之后的步骤中，将其导入的Controller Manager中。那机械臂的配置文件如何写呢？机械臂的Controller有joint_names，它的yaml文件的格式可能会与底盘的不同。<br>
-2、机械臂RobotHW中的transmission_interface自己是按照ros_control官方Wiki改的，可是在代码中一加上Transmission的那部分，运行程序时就会有莫名的"process died"的问题，而且并不会有串口数据产生。我和壕查了各种网上的资料文档，但还是没能解决这个问题，看来之后还需请教学长了。<br>
+2、机械臂RobotHW中的transmission_interface自己是按照ros_control官方Wiki改的，可是在代码中一加上Transmission的那部分，运行程序时就会有莫名的"Process died"的问题，而且并不会有串口数据产生。我和壕查了各种网上的资料文档，但还是没能解决这个问题，看来之后还需请教学长了。<br>
 3、之前自己给串口发Topic，串口的双向指示灯都没有亮起。之后在电子组的帮助下，发现原来机械臂各个关节的模块编号是重新定义过的。用了新的协议之后，串口终于有了数据。根据串口程序里的定义，串口是订阅/SendSerialData的这个Topic来获取由xm_robothw发送的关节位置控制数据的。但我用rqt来修改/SendSerialData里的数据值并发布这个Topic时，机械臂并没有按照我的意愿来动，这个很奇怪，我觉得没有什么其他的大问题，最后推测最有可能出现问题的地方就是数据的发送格式不对，这个还要自己尽快研究一下。<br>
 4、xm_robothw中的机械臂与底盘的代码同时取消注释并运行时，会有冲突发生。但问题貌似不在串口程序，因为控制底盘与机械臂的STM32控制板是两个，所以是互不影响的，把代码分开就应该不会有什么太大的问题。<br>
 
@@ -87,7 +87,7 @@
 2、给xm_robothw中添加关节限制的部分，但是出现一些问题，以后再修改。它的过程首先是让xm_robothw中读入URDF文件中有关关节Limits的信息，并在每次在write的时候把Limits强制加到之前注册的关节句柄中去。<br>
 3、添加了xm_teleop包来遥控机械臂。相比之前我所完成的内容，我添加了每个关节的限制，并且对操作界面做了一定的优化。<br>
 4、我学习完了roscon 2014的ros_control的pdf文档资料，最大的收获就是自己对整个ros_control的架构有了更深入一步的理解。其中它讲述了ros_control的数据流循环。它的流程是Read from HW -> Actuator to joint state -> Controller manager update(emergency stop handing) -> Joint limits ecforcing -> Joint to actuator command -> Write commands to HW。这个与我之前自己学习ros_control所理解的差不多，不过有所不同的是control_thread是可以和其他spinner_thread进行通信的。此外还有Controller Manager中对相应Controllers的lifecycle管理。它的整个过程也是一个小型的循环，首先是load由初始态到达stop的状态，接着start从stop态进入running的状态，触发stop命令可以从running态进入stop状态，最后执行unload命令能让Controller从stop态转变成初始态。<br>
-5、这周的最后一天，我直接上有关Transmission部分的源码，仔细看过之后，我基本明白了Transmission的实现原理。源码中的Transmission定义了关节转换的公式，其中包括simple_transmission和differential_transmission。我记得自己之前在给xmbot添加Transmission时，代码总是在运行时出现无故的进程死掉问题。当时我是按照官方的Wiki文档改写的，现在我觉得问题的原因很有可能是程序push back电机或关节初始变量值时，因为其初始值并没有在之前的代码块中载入或初始化，所以在运行程序时，hardware_interface会因无法转换数据而报"process died"。<br>
+5、这周的最后一天，我直接上有关Transmission部分的源码，仔细看过之后，我基本明白了Transmission的实现原理。源码中的Transmission定义了关节转换的公式，其中包括simple_transmission和differential_transmission。我记得自己之前在给xmbot添加Transmission时，代码总是在运行时出现无故的进程死掉问题。当时我是按照官方的Wiki文档改写的，现在我觉得问题的原因很有可能是程序push back电机或关节初始变量值时，因为其初始值并没有在之前的代码块中载入或初始化，所以在运行程序时，hardware_interface会因无法转换数据而报"Process died"。<br>
 
 **问题：**<br>
 1、根据电子组告诉给我的信息，串口发送的数据是电机的旋转角度，而不是我之前认为的关节的角度。所以我之前完成的遥控机械臂的程序是有问题的，它控制的并不是真正的关节的位置，而是电机的位置。这个我会在添加完Transmission后再更改。<br>
@@ -122,7 +122,7 @@
 4、自己继续完善了xm_robothw的代码，现在终于可以把输入的关节位置转换成电机的数据，算是有了一点进步。不过，这也就是单个关节，而多个关节的解算还存在一些小问题。而且对于之前关节的限制问题，我还是要看一下源码，好好研究一下。现在自己对关节限制的那部分代码的原理还不是很清楚，并不知道自己之前写的是否可以发挥作用。总之，硬件层封装没有想象中的简单。<br>
 
 **问题：**<br>
-1、自己已经根据官方的Wiki文档进行了适当的改写，但代码在进行编译的时候会报很多的错误。其中的一类错误是vector类型的数据没有办法被赋值，错误具体是"cannot convert 'float*' to 'double'"或者是"cannot convert 'double*' to 'double'"。这个令我非常费解，到底是什么导致了这种问题？我初步认为问题发生可能是没有合法的使用vector的下标引用所造成的。还有就是在运行xm_robothw节点时，程序会自动地抛出异常，具体是"Transmission reduction ratio cannot be zero"，我推测是需要把默认的reduction值显式地初始化出来才行。<br>
+1、自己已经根据官方的Wiki文档进行了适当的改写，但代码在进行编译的时候会报很多的错误。其中的一类错误是vector类型的数据没有办法被赋值，错误具体是"Cannot convert 'float*' to 'double'"或者是"Cannot convert 'double*' to 'double'"。这个令我非常费解，到底是什么导致了这种问题？我初步认为问题发生可能是没有合法的使用vector的下标引用所造成的。还有就是在运行xm_robothw节点时，程序会自动地抛出异常，具体是"Transmission reduction ratio cannot be zero"，我推测是需要把默认的reduction值显式地初始化出来才行。<br>
 
 **解决：**<br>
 1、上面的编译问题已经得到了解决，主要错误是出在了我没有看清楚等式两边的元素类型，一个是值，而另一个是指针，这样赋值是肯定不会编译通过的，算是自己犯了个非常低级的失误吧。不过就算是编译完成之后，在运行时依旧会有程序直接死掉的问题，这个异常的问题其实在终端里有抛出异常，我之前并没有太注意，没有仔细看终端里返回的问题原因，这个只能怪自己不认真了。问题具体是：
@@ -210,7 +210,7 @@
 3、配置好了基础的MoveIt!，在简单轨迹方案测试过后可以尝试加入到机器人中去。<br>
 
 **问题：**<br>
-1、自己在给机械臂加入gripper_action_controller时，总会有"could not find name on param server"的错误，我在Google上查了很多资料，但有用的很少，其中一个解决的办法是将gripper_action_controller注册到hardware_interface::RobotHW类中去，但问题还是没有得到解决。<br>
+1、自己在给机械臂加入gripper_action_controller时，总会有"Could not find name on param server"的错误，我在Google上查了很多资料，但有用的很少，其中一个解决的办法是将gripper_action_controller注册到hardware_interface::RobotHW类中去，但问题还是没有得到解决。<br>
 2、我之前给机器人加的是Arbotix的Controller。在MoveIt!里做运动轨迹时，从joint_states里可以看到每个关节都有数值的连续变化，而当我想用position_controllers/JointTrajectoryController时，基本的配置是没有什么问题的。但是我在用MoveIt!的API来控制关节的轨迹时，发现关节跑的是路径而不是戳上时间戳的连续轨迹变化，感觉这是个比较麻烦的问题。<br>
 
 **解决：**<br>
