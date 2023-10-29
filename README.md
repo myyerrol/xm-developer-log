@@ -1,1 +1,1 @@
-# xm_developer_log
+# xm-developer-log
